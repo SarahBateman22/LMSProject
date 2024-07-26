@@ -89,24 +89,29 @@ namespace LMS.Controllers
         public IActionResult GetClassOfferings(string subject, int number)
         {        
 
-            //TODO: check if this is returning the correct professor
-            
             var classes = from cl in db.Classes
-                         join co in db.Courses on cl.ClassId equals co.CatalogId
-                         where co.Name == subject && co.Number == number
-                         join p in db.Professors on co.Name equals p.WorksIn
-                         select new 
-                         {
-                             Season = cl.Season,
-                             Year = cl.Year,
-                             Location = cl.Location,
-                             Start = cl.StartTime, 
-                             End = cl.EndTime,
-                             FName = p.FName,
-                             LName = p.LName
-                         };
+                join co in db.Courses on cl.Listing equals co.CatalogId
+                where co.Department == subject && co.Number == number
+                join p in db.Professors on cl.TaughtBy equals p.UId
+                select new 
+                {
+                    season = cl.Season,
+                    year = cl.Year,
+                    location = cl.Location,
+                    Start = cl.StartTime.ToString(),
+                    End = cl.EndTime.ToString(),
+                    fname = p.FName, 
+                    lname = p.LName
+                };
 
-            return Json(classes.ToList());
+                var result = classes.ToList();
+
+                if (!result.Any()) 
+                {
+                    return NotFound("No class offerings found matching the criteria."); 
+                }
+
+                return Json(result);
         }
 
         /// <summary>
@@ -123,18 +128,65 @@ namespace LMS.Controllers
         /// <returns>The assignment contents</returns>
         public IActionResult GetAssignmentContents(string subject, int num, string season, int year, string category, string asgname)
         {         
-            //subject, num -- COURSES; season, year -- CLASSES; category -- ASSIGNMENTCATEGORIES; asgname -- ASSIGNMENTS;
-            var contents = (from co in db.Courses
-                join cl in db.Classes on co.CatalogId equals cl.Listing
-                join ac in db.AssignmentCategories on cl.ClassId equals ac.InClass
-                join asn in db.Assignments on ac.CategoryId equals asn.Category
-                where co.Department == subject && co.Number == num
-                    && cl.Season == season && cl.Year == year
-                    && ac.Name == category && asn.Name == asgname
-                select asn.Contents).FirstOrDefault();
 
-            return Content(contents);
+            //had to break it down step by step to see where it was failing
+            var filteredCourses = from co in db.Courses
+                      where co.Department == subject && co.Number == num
+                      select co;
+
+            if(filteredCourses == null){
+                return Content("Failed on finding course");
+            }
+
+            var filteredClasses = from cl in db.Classes
+                      join co in filteredCourses on cl.Listing equals co.CatalogId
+                      where cl.Season == season && cl.Year == year
+                      select cl;
+
+            if(filteredClasses == null){
+                return Content("Failed on finding class");
+            }
+
+            var filteredCategories = from ac in db.AssignmentCategories
+                         join cl in filteredClasses on ac.InClass equals cl.ClassId
+                         where ac.Name == category
+                         select ac;
+
+            if(filteredCategories == null){
+                return Content("Failed on finding category");
+            }
+
+            var filteredAssignments = from a in db.Assignments
+                          join ac in filteredCategories on a.Category equals ac.CategoryId
+                          where a.Name == asgname
+                          select a.Contents;
+
+            if(filteredAssignments == null){
+                return Content("Failed on finding assignment");
+            }
+
+            var assignmentContents = filteredAssignments.FirstOrDefault();
+
+            if (assignmentContents == null)
+            {
+                return Content("Failed on getting first or default");
+            }
+
+            return Content(assignmentContents);
         }
+
+        //subject, num -- COURSES; season, year -- CLASSES; category -- ASSIGNMENTCATEGORIES; asgname -- ASSIGNMENTS;
+            // var contents = (from co in db.Courses
+            //     join cl in db.Classes on co.CatalogId equals cl.Listing
+            //     join ac in db.AssignmentCategories on cl.ClassId equals ac.InClass
+            //     join asn in db.Assignments on ac.CategoryId equals asn.Category
+            //     where co.Department == subject && co.Number == num
+            //         && cl.Season == season && cl.Year == year
+            //         && ac.Name == category && asn.Name == asgname
+            //     select asn.Contents).FirstOrDefault();
+
+            // //var contents = "testing content here";
+            // return Content(contents);
 
 
         /// <summary>
@@ -187,45 +239,49 @@ namespace LMS.Controllers
         /// </returns>
         public IActionResult GetUser(string uid)
         {           
-            Professor professor = db.Professors.FirstOrDefault(p => p.UId == uid);
-            Student student = db.Students.FirstOrDefault(s => s.UId == uid);
-            Administrator admin = db.Administrators.FirstOrDefault(a => a.UId == uid);
+            var professor = db.Professors.FirstOrDefault(p => p.UId == uid);
+            var student = db.Students.FirstOrDefault(s => s.UId == uid);
+            var admin = db.Administrators.FirstOrDefault(a => a.UId == uid);
 
-            if(professor != null){
-                Professor p = new Professor();
+            if (professor != null)
+            {
+                var userObject = new
+                {
+                    fname = professor.FName,
+                    lname = professor.LName,
+                    uid = professor.UId,
+                    department = professor.WorksIn
+                };
 
-                p.UId = uid;
-                p.FName = professor.FName;
-                p.LName = professor.LName;
-                p.WorksIn = professor.WorksIn;
-
-                return Json(p);
+                return Json(userObject);
             }
 
-            if(student != null){
-                Student s = new Student();
+            if (student != null)
+            {
+                var userObject = new
+                {
+                    fname = student.FName,
+                    lname = student.LName,
+                    uid = student.UId,
+                    department = student.Major
+                };
 
-                s.UId = uid;
-                s.FName = student.FName;
-                s.LName = student.LName;
-                s.Major = student.Major;
-
-                return Json(s);
+                return Json(userObject);
             }
 
-            if(admin != null){
-                Administrator a = new Administrator();
+            if (admin != null)
+            {
+                var userObject = new
+                {
+                    fname = admin.FName,
+                    lname = admin.LName,
+                    uid = admin.UId
+                };
 
-                a.UId = uid;
-                a.FName = admin.FName;
-                a.LName = admin.LName;
-
-                return Json(a);
+                return Json(userObject);
             }
 
-            else {
-                return Json(new { success = false });
-            }
+            return Json(new { success = false });
 
         }
 

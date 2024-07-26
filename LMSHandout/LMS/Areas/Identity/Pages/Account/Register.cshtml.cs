@@ -237,45 +237,30 @@ namespace LMS.Areas.Identity.Pages.Account
 
         }
 
-        string createUID(){
-
-            //initialize max uid to 0
+        private string createUID()
+        {
             int maxUid = 0;
 
-            //find max uid in all of the users
-            var maxAdminUid = db.Administrators
-                                .OrderByDescending(a => a.UId)
-                                .Select(a => a.UId)
-                                .FirstOrDefault();
-            if (!string.IsNullOrEmpty(maxAdminUid) && int.TryParse(maxAdminUid, out int adminUid))
-            {
-                maxUid = Math.Max(maxUid, adminUid);
-            }
+            string adminMaxID = db.Administrators.Select(x => x.UId).DefaultIfEmpty().Max();
+            string profMaxID = db.Professors.Select(x => x.UId).DefaultIfEmpty().Max();
+            string studentMaxID = db.Students.Select(x => x.UId).DefaultIfEmpty().Max();
 
-            var maxStudentUid = db.Students
-                                .OrderByDescending(s => s.UId)
-                                .Select(s => s.UId)
-                                .FirstOrDefault();
-            if (!string.IsNullOrEmpty(maxStudentUid) && int.TryParse(maxStudentUid, out int studentUid))
-            {
-                maxUid = Math.Max(maxUid, studentUid);
-            }
+            if (adminMaxID != null)
+                maxUid = Math.Max(maxUid, int.Parse(adminMaxID.Substring(1)));
 
-            var maxProfessorUid = db.Professors
-                                    .OrderByDescending(p => p.UId)
-                                    .Select(p => p.UId)
-                                    .FirstOrDefault();
-            if (!string.IsNullOrEmpty(maxProfessorUid) && int.TryParse(maxProfessorUid, out int professorUid))
-            {
-                maxUid = Math.Max(maxUid, professorUid);
-            }
+            if (profMaxID != null)
+                maxUid = Math.Max(maxUid, int.Parse(profMaxID.Substring(1)));
 
-            //new id is max id + 1
+            if (studentMaxID != null)
+                maxUid = Math.Max(maxUid, int.Parse(studentMaxID.Substring(1)));
+
             int newUid = maxUid + 1;
 
-            return newUid.ToString();
+            string returnID = $"u{newUid:D7}";
 
+            return returnID;
         }
+
 
         /*******End code to modify********/
     }
